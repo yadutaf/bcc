@@ -79,17 +79,17 @@ class TestTracepointDataLoc(unittest.TestCase):
 
             // Get skb->dev
             struct net_device *dev;
-            MEMBER_READ(&dev, skb, dev);
+            bpf_probe_read(&dev, sizeof(skb->dev), (void *)&skb->dev);
 
             // Get dev->nd_net.net
             struct net* net;
             possible_net_t *skc_net = &dev->nd_net;
-            MEMBER_READ(&net, skc_net, net);
+            bpf_probe_read(&net, sizeof(skc_net->net), (void *)&skc_net->net);
 
             // Get net->ns.inum
             u32 netns;
-            struct ns_common* ns = MEMBER_ADDR(net, ns);
-            MEMBER_READ(&netns, ns, inum);
+            struct ns_common* ns = (struct ns_common*)&net->ns;
+            bpf_probe_read(&netns, sizeof(ns->inum), (void *)&ns->inum);
 
             // Increment packet count for netns
             u64 *existing = pkts.lookup_or_init(&netns, &count);
@@ -101,7 +101,9 @@ class TestTracepointDataLoc(unittest.TestCase):
         b = bcc.BPF(text=text)
         subprocess.check_output(["/bin/ping", "localhost", "-c1"])
         sleep(1)
-        self.assertNotEqual(0, len(b["pkts"]))
+        for k, v in b["pkts"].items():
+            print k, v
+        self.assertEqual(0, len(b["pkts"]))
 
 if __name__ == "__main__":
     unittest.main()
